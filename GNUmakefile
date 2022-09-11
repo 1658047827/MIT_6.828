@@ -313,3 +313,6 @@ always:
 
 .PHONY: all always \
 	handin git-handin tarball tarball-pref clean realclean distclean grade handin-prep handin-check
+
+# To fix triple fault (method from stackoverflow)
+# CFLAGS += -fno-pic
