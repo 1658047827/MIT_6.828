@@ -50,6 +50,7 @@ SECTIONS
 	PROVIDE(edata = .);
 
 	.bss : {
+		edata = .;  /* to fix boot triple fault */
 		*(.bss)
 	}
 
