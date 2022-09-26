@@ -391,7 +391,35 @@ pte_t *
 pgdir_walk(pde_t *pgdir, const void *va, int create)
 {
 	// Fill this function in
-	return NULL;
+	// 注意此时所有的C指针都是虚拟地址
+	pte_t * pgtab;
+	pde_t * pde;
+
+	// 调用PDX宏获取线性地址va对应页目录中的index
+	int pgdir_index = PDX(va);
+	// 调用PTX宏获取线性地址va对应页表中的index
+	int pgtab_index = PTX(va);
+	// 根据下标获取，然后取地址，即为页目录项的地址
+	pde = &pgdir[pgdir_index];
+
+	// 解引用后，和PTE_P相与，PTE_P对应PTE的最后一位Present
+	// 判断是不是已经存在该页，是的话计算出页表地址即可
+	if(*pde & PTE_P){
+		// PTE_ADDR宏取页目录项里面的值，抽取出高20位的物理基地址
+		// 然后用KADDR宏转化为虚拟地址（不能直接将物理地址赋给一个指针）
+		pgtab = (pte_t *)KADDR(PTE_ADDR(*pde));
+	}else {  // 页表页不存在
+		if(!create) return NULL;  // 不进行页分配
+		struct PageInfo * newPage = page_alloc(ALLOC_ZERO);
+		if(!newPage) return NULL;  // 分配失败
+		newPage->pp_ref++;  // 增加引用计数
+		// 页的物理地址肯定是4KB对齐的，所以低位都是0，我们或上标志位信息
+		*pde = page2pa(newPage) | PTE_U | PTE_W | PTE_P;
+		// 将页对应的KERNBASE以上的虚拟地址
+		pgtab = page2kva(newPage);
+	}
+	// 页表地址+偏移地址（&数组[下标]）的方式返回
+	return &pgtab[pgtab_index];
 }
 
 //
