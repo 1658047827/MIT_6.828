@@ -418,7 +418,7 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 		// 将页对应的KERNBASE以上的虚拟地址
 		pgtab = page2kva(newPage);
 	}
-	// 页表地址+偏移地址（&数组[下标]）的方式返回
+	// 页表地址+偏移量（&数组[下标]）的方式返回
 	return &pgtab[pgtab_index];
 }
 
@@ -437,6 +437,15 @@ static void
 boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm)
 {
 	// Fill this function in
+	pte_t * pte;
+	for(size_t i=0; i<size; i+=PGSIZE){
+		pte = pgdir_walk(pgdir, (void *)va+i, 1);
+		if(pte==NULL) 
+			panic("boot_map_region(): out of memory\n");
+		else
+			*pte = pa | perm | PTE_P;
+		pa+=PGSIZE;
+	}
 }
 
 //
@@ -468,6 +477,16 @@ int
 page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 {
 	// Fill this function in
+	// 先查找va对应的PTE，有需要时pgdir_walk会自动为我们分配页表页，并插入pgdir
+	pte_t *pte = pgdir_walk(pgdir, va, 1);
+	if(!pte) return -E_NO_MEM;  // 分配页表页失败
+	pp->pp_ref++;  // 接下来肯定插入成功，所以自增
+	if(*pte & PTE_P){  // 说明之前就有物理页对应到va
+		page_remove(pgdir, va);  // 要先移除这个映射
+		// 注意page_remove()已经含有tlb_invalidate，这里无需再调用了
+	}
+	// 更新页表项中的信息
+	*pte = page2pa(pp) | perm | PTE_P;
 	return 0;
 }
 
@@ -486,7 +505,20 @@ struct PageInfo *
 page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 {
 	// Fill this function in
-	return NULL;
+	pte_t * pte = pgdir_walk(pgdir, va, 0);
+	// 考虑：对应的page table页不存在
+	if(!pte) return NULL;
+	else{ // page table页存在
+		// 但*pte（表项）的Present位为0，物理页未分配
+		// 或者干脆*pte就全为0，还没有插入内容
+		if(!(*pte & PTE_P)) return NULL;
+		if(pte_store) {
+			*pte_store=pte;
+		}
+		// 利用PTE_ADDR宏（pte注意解引用）获取物理地址
+		// 然后利用pa2page转成struct PageInfo
+		return pa2page(PTE_ADDR(*pte));
+	}
 }
 
 //
@@ -508,6 +540,16 @@ void
 page_remove(pde_t *pgdir, void *va)
 {
 	// Fill this function in
+	pte_t* pte_store;
+	struct PageInfo* pgInf = page_lookup(pgdir, va, &pte_store);
+	if(pgInf){
+		// 引用计数--，并自动释放物理页
+		page_decref(pgInf);
+		// 清空va对应的PTE 
+		*pte_store=0;
+		// TLB保持一致性
+		tlb_invalidate(pgdir, va);
+	}
 }
 
 //
