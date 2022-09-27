@@ -480,7 +480,7 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 	// 先查找va对应的PTE，有需要时pgdir_walk会自动为我们分配页表页，并插入pgdir
 	pte_t *pte = pgdir_walk(pgdir, va, 1);
 	if(!pte) return -E_NO_MEM;  // 分配页表页失败
-	pp->pp_ref++;  // 接下来肯定插入成功，所以自增
+	pp->pp_ref++;  // 接下来肯定插入成功，所以引用计数自增
 	if(*pte & PTE_P){  // 说明之前就有物理页对应到va
 		page_remove(pgdir, va);  // 要先移除这个映射
 		// 注意page_remove()已经含有tlb_invalidate，这里无需再调用了
