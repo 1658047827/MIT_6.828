@@ -3,6 +3,8 @@
         "types.h": "c",
         "stdio.h": "c",
         "stab.h": "c",
-        "string.h": "c"
+        "string.h": "c",
+        "pmap.h": "c",
+        "monitor.h": "c"
     }
 }

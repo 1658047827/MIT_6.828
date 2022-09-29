@@ -423,7 +423,7 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 		// PTE_ADDR宏取页目录项里面的值，抽取出高20位的物理基地址
 		// 然后用KADDR宏转化为虚拟地址（不能直接将物理地址赋给一个指针）
 		pgtab = (pte_t *)KADDR(PTE_ADDR(*pde));
-	}else {  // 页表页不存在
+	} else {  // 页表页不存在
 		if(!create) return NULL;  // 不进行页分配
 		struct PageInfo * newPage = page_alloc(ALLOC_ZERO);
 		if(!newPage) return NULL;  // 分配失败

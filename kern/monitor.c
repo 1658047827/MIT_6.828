@@ -10,6 +10,7 @@
 #include <kern/console.h>
 #include <kern/monitor.h>
 #include <kern/kdebug.h>
+#include <kern/pmap.h>
 
 #define CMDBUF_SIZE	80	// enough for one VGA text line
 
@@ -25,6 +26,7 @@ static struct Command commands[] = {
 	{ "help", "Display this list of commands", mon_help },
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
 	{ "backtrace", "Display the stack frame and caller info", mon_backtrace},
+	{ "showmapping", "Display the physical page mappings that apply to a particular range of virtual/linear addresses", mon_showmapping},
 };
 
 /***** Implementations of basic kernel monitor commands *****/
@@ -90,6 +92,43 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 	return 0;
 }
 
+int mon_showmapping(int argc, char **argv, struct Trapframe *tf){
+	uintptr_t addr_begin=0;
+	uintptr_t addr_end=0;
+
+	// 先获取参数，包括判断使用方式是否正确
+	if(argc != 3){
+		cprintf("Usage: showmapping 0xADDR_BEGIN 0xADDR_END\n");
+		return 0;
+	}else{
+		addr_begin=strtol(argv[1], NULL, 16);
+		addr_end=strtol(argv[2], NULL, 16);
+		if(addr_begin > addr_end) {
+			cprintf("Error: ADDR_BEGIN should be less than ADDR_END\n");
+			return 0;
+		}
+	}
+
+	pte_t *pte = NULL;
+	cprintf("-----------------------------------------\n"
+			"VirAddress  PhyAddress  PTE_P PTE_W PTE_U\n");
+	for(addr_begin=ROUNDDOWN(addr_begin, PGSIZE); addr_begin<=addr_end; addr_begin+=PGSIZE){
+		pte=pgdir_walk(kern_pgdir, (void *)addr_begin, 0);  // not create
+		if(pte && *pte&PTE_P){
+			cprintf("0x%08x  0x%08x    %d     %d     %d\n", 
+					addr_begin,
+					PTE_ADDR(*pte),
+					*pte & PTE_P,
+					(*pte & PTE_W)>>1,
+					(*pte & PTE_U)>>2);
+		}else{
+			// 页表页还没分配或者PTE_P=0
+			cprintf("0x%08x  ----------    -     -     -\n",
+					addr_begin);
+		}
+	}
+	return 0;
+}
 
 
 /***** Kernel monitor command interpreter *****/
