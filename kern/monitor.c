@@ -27,6 +27,7 @@ static struct Command commands[] = {
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
 	{ "backtrace", "Display the stack frame and caller info", mon_backtrace},
 	{ "showmapping", "Display the physical page mappings that apply to a particular range of virtual/linear addresses", mon_showmapping},
+	{ "setperm", "Set the permissions of any memory mapping", mon_setpermisson},
 };
 
 /***** Implementations of basic kernel monitor commands *****/
@@ -127,6 +128,56 @@ int mon_showmapping(int argc, char **argv, struct Trapframe *tf){
 					addr_begin);
 		}
 	}
+	return 0;
+}
+
+int mon_setpermisson(int argc, char **argv, struct Trapframe *tf){
+	uintptr_t addr_begin=0;
+	uintptr_t addr_end=0;
+
+	// 先获取参数，包括判断使用方式是否正确
+	if(argc != 5){
+		cprintf("Usage: setperm 0xADDR_BEGIN 0xADDR_END [0|1] [P|W|U]\n");
+		return 0;
+	}else{
+		addr_begin=strtol(argv[1], NULL, 16);
+		addr_end=strtol(argv[2], NULL, 16);
+		if(addr_begin > addr_end) {
+			cprintf("Error: ADDR_BEGIN should be less than ADDR_END\n");
+			return 0;
+		}
+	}
+
+	pte_t *pte = NULL;
+	uint32_t perm=0;
+	uint32_t set=0;
+	switch(argv[4][0]){
+		case 'P':
+			perm=PTE_P;
+			break;
+		case 'W':
+			perm=PTE_W;
+			break;
+		case 'U':
+			perm=PTE_U;
+			break;
+		default:
+			cprintf("Error: invalid permission type\n");
+			return 0;
+	}
+	if(argv[3][0]=='1') set=1;
+	for(addr_begin=ROUNDDOWN(addr_begin, PGSIZE); addr_begin<=addr_end; addr_begin+=PGSIZE){
+		pte=pgdir_walk(kern_pgdir, (void *)addr_begin, 0);  // not create
+		if(pte){  // 不限制设置的表项一定得有效
+			if(set==0) 
+				*pte = *pte & ~perm;
+			else
+				*pte =*pte | perm;
+		}
+	}
+	// 输出修改后的结果
+	mon_showmapping(argc-2, argv, tf);
+
 	return 0;
 }
 
