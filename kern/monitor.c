@@ -28,6 +28,7 @@ static struct Command commands[] = {
 	{ "backtrace", "Display the stack frame and caller info", mon_backtrace},
 	{ "showmapping", "Display the physical page mappings that apply to a particular range of virtual/linear addresses", mon_showmapping},
 	{ "setperm", "Set the permissions of any memory mapping", mon_setpermisson},
+	{ "dump", "Dump the contents of a range of memory", mon_dump},
 };
 
 /***** Implementations of basic kernel monitor commands *****/
@@ -177,7 +178,11 @@ int mon_setpermisson(int argc, char **argv, struct Trapframe *tf){
 	}
 	// 输出修改后的结果
 	mon_showmapping(argc-2, argv, tf);
+	return 0;
+}
 
+int mon_dump(int argc, char **argv, struct Trapframe *tf){
+	// TODO
 	return 0;
 }
 
