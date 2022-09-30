@@ -181,8 +181,35 @@ int mon_setpermisson(int argc, char **argv, struct Trapframe *tf){
 	return 0;
 }
 
-int mon_dump(int argc, char **argv, struct Trapframe *tf){
-	// TODO
+int mon_dump(int argc, char **argv, struct Trapframe *tf){  // 打印出制定物理/虚拟地址的内存内容
+	uintptr_t addr_begin=0;
+	uintptr_t addr_end=0;
+
+	// 先获取参数，包括判断使用方式是否正确
+	if(argc != 4){
+		cprintf("Usage: dump [p|v] 0xADDR_BEGIN 0xADDR_END\n");
+		return 0;
+	}else{
+		addr_begin=strtol(argv[2], NULL, 16);
+		addr_end=strtol(argv[3], NULL, 16);
+		if(addr_begin > addr_end) {
+			cprintf("Error: ADDR_BEGIN should be less than ADDR_END\n");
+			return 0;
+		}
+	}
+
+	if(argv[1][0]=='p') {  // 物理地址
+		if(PGNUM(addr_end) >= npages){
+			cprintf("Error: ADDR_END(0x%08x) out of range\n", addr_end);
+			return 0;
+		}
+		addr_begin+=KERNBASE;
+		addr_end+=KERNBASE;
+	}
+	
+	for(;addr_begin<=addr_end;addr_begin+=4){
+		cprintf("0x%08x: 0x%08x\n", addr_begin, *((uint32_t*)addr_begin));
+	}
 	return 0;
 }
 
