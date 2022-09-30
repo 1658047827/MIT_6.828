@@ -181,7 +181,7 @@ int mon_setpermisson(int argc, char **argv, struct Trapframe *tf){
 	return 0;
 }
 
-int mon_dump(int argc, char **argv, struct Trapframe *tf){  // 打印出制定物理/虚拟地址的内存内容
+int mon_dump(int argc, char **argv, struct Trapframe *tf){  // 打印出指定物理/虚拟地址的内存内容
 	uintptr_t addr_begin=0;
 	uintptr_t addr_end=0;
 
