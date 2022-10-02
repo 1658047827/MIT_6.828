@@ -167,6 +167,9 @@ mem_init(void)
 	//////////////////////////////////////////////////////////////////////
 	// Make 'envs' point to an array of size 'NENV' of 'struct Env'.
 	// LAB 3: Your code here.
+	// 模仿lab2的方式分配物理内存
+	envs = (struct Env *) boot_alloc(sizeof(struct Env) * NENV);
+	memset(envs, 0, sizeof(struct Env) * NENV);  // 初始化
 
 	//////////////////////////////////////////////////////////////////////
 	// Now that we've allocated the initial kernel data structures, we set
@@ -203,6 +206,12 @@ mem_init(void)
 	//    - the new image at UENVS  -- kernel R, user R
 	//    - envs itself -- kernel RW, user NONE
 	// LAB 3: Your code here.
+	// 建立虚拟地址到物理地址的映射
+	boot_map_region(kern_pgdir,
+					UENVS,
+					NENV*sizeof(struct Env),
+					PADDR(envs),
+					PTE_U | PTE_P);
 
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
@@ -312,9 +321,9 @@ page_init(void)
 	}
 
 	// 4) Extended Memory 需要注意分配给内核的我们都应该设为被占用
-	// 内核代码+pg_dir+pages之后的才是空闲的页
+	// 内核代码+pg_dir+pages+envs之后的才是空闲的页
 	// entry.S已经开分页了，所以调用PADDR将内核虚拟地址转为物理地址
-	physaddr_t kernel_top = PADDR(boot_alloc(0));  
+	physaddr_t kernel_top = PADDR(boot_alloc(0));  // 利用boot_alloc确定下一位空闲的位置
 	// 将物理地址转换成页号
 	size_t page_afterKern = PGNUM(kernel_top); 
 
