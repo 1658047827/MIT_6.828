@@ -116,6 +116,15 @@ env_init(void)
 {
 	// Set up envs array
 	// LAB 3: Your code here.
+	env_free_list=NULL;  // 先将空闲环境链表设置为空
+	// 为了让envs[0]在头部，且使用前插，所以需要逆序循环
+	for(int i=NENV-1;i>=0;++i){ 
+		envs[i].env_status=ENV_FREE;  // 标记为空闲
+		envs[i].env_id=0;  // 设置为0
+		// 前插的方式
+		envs[i].env_link=env_free_list;
+		env_free_list=&envs[i];
+	}
 
 	// Per-CPU part of the initialization
 	env_init_percpu();
@@ -179,6 +188,10 @@ env_setup_vm(struct Env *e)
 	//    - The functions in kern/pmap.h are handy.
 
 	// LAB 3: Your code here.
+	p->pp_ref++;  // pp_ref自增以确保env_free正常运行
+	e->env_pgdir=page2kva(p);  // 设置env_pgdir字段
+	memcpy(e->env_pgdir, kern_pgdir, PGSIZE);  // 将内核页表的内容拷到环境页表
+	// 原本kern_pgdir的UTOP以下的地址就没有映射，所以这里不用特地清零
 
 	// UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R
@@ -267,6 +280,19 @@ region_alloc(struct Env *e, void *va, size_t len)
 	//   'va' and 'len' values that are not page-aligned.
 	//   You should round va down, and round (va + len) up.
 	//   (Watch out for corner-cases!)
+
+	struct PageInfo *p;
+	// 按照提示进行舍入
+	void *begin = ROUNDDOWN(va, PGSIZE);
+	void *end = ROUNDUP(va+len, PGSIZE);
+	// 循环分配映射页，同时注意end是向上舍入的，所以结束条件是<而不是<=
+	for(;begin<end;begin+=PGSIZE){
+		p=page_alloc(0);  // 注意不要以任何方式清零或初始化页
+		// 如果分配失败则panic
+		if(!p) panic("region_alloc fail: out of memory\n");
+		int result = page_insert(e->env_pgdir, p, begin, PTE_U | PTE_W);  // 该函数内已经 perm | PTE_P 了
+		if(result!=0) panic("region_alloc: %e", result); 
+	}
 }
 
 //
