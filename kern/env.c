@@ -118,7 +118,7 @@ env_init(void)
 	// LAB 3: Your code here.
 	env_free_list=NULL;  // 先将空闲环境链表设置为空
 	// 为了让envs[0]在头部，且使用前插，所以需要逆序循环
-	for(int i=NENV-1;i>=0;++i){ 
+	for(int i=NENV-1;i>=0;--i){ 
 		envs[i].env_status=ENV_FREE;  // 标记为空闲
 		envs[i].env_id=0;  // 设置为0
 		// 前插的方式
@@ -190,7 +190,7 @@ env_setup_vm(struct Env *e)
 	// LAB 3: Your code here.
 	p->pp_ref++;  // pp_ref自增以确保env_free正常运行
 	e->env_pgdir=page2kva(p);  // 设置env_pgdir字段
-	memcpy(e->env_pgdir, kern_pgdir, PGSIZE);  // 将内核页表的内容拷到环境页表
+	memcpy(e->env_pgdir, kern_pgdir, PGSIZE);  // 将内核页目录的内容拷到环境页目录
 	// 原本kern_pgdir的UTOP以下的地址就没有映射，所以这里不用特地清零
 
 	// UVPT maps the env's own page table read-only.
@@ -287,10 +287,12 @@ region_alloc(struct Env *e, void *va, size_t len)
 	void *end = ROUNDUP(va+len, PGSIZE);
 	// 循环分配映射页，同时注意end是向上舍入的，所以结束条件是<而不是<=
 	for(;begin<end;begin+=PGSIZE){
+		// 分配物理页
 		p=page_alloc(0);  // 注意不要以任何方式清零或初始化页
 		// 如果分配失败则panic
 		if(!p) panic("region_alloc fail: out of memory\n");
-		int result = page_insert(e->env_pgdir, p, begin, PTE_U | PTE_W);  // 该函数内已经 perm | PTE_P 了
+		// 使用page_insert插入，该函数内已经 perm | PTE_P 了
+		int result = page_insert(e->env_pgdir, p, begin, PTE_U | PTE_W);  
 		if(result!=0) panic("region_alloc: %e", result); 
 	}
 }
@@ -349,11 +351,43 @@ load_icode(struct Env *e, uint8_t *binary)
 	//  What?  (See env_run() and env_pop_tf() below.)
 
 	// LAB 3: Your code here.
+	struct Proghdr *ph, *eph;
+	struct Elf *elf_hdr = (struct Elf *)binary;
+	// 检查是否为合法的ELF
+	if (elf_hdr->e_magic != ELF_MAGIC)
+        panic("load_icode fail: invalid ELF binary\n");
+	// 获取program header（程序头部表）
+	ph = (struct Proghdr *) (binary + elf_hdr->e_phoff);
+	eph = ph + elf_hdr->e_phnum;
+
+	// 在开始循环装载之前须切换页目录，env_pgdir也有kern_pgdir的copy，
+	// 所以可以正常访问内核虚拟空间地址
+	lcr3(PADDR(e->env_pgdir));  // 将内核虚拟地址转换成物理地址
+
+	// 遍历段头表
+	for(;ph<eph;ph++){
+		// 只加载ELF_PROG_LOAD的段
+		if(ph->p_type==ELF_PROG_LOAD){
+			// 建立好加载ELF所需要的映射，分配相应的物理页
+			region_alloc(e, (void *)ph->p_va, ph->p_memsz);
+			// 载入ELF映像
+			memcpy((void *)ph->p_va, (void *)binary+ph->p_offset, ph->p_filesz);
+			// 清零多余字节
+			memset((void *)ph->p_va+ph->p_filesz, 0, ph->p_memsz-ph->p_filesz);
+		}
+	}
+
+	// 设置trapframe（陷阱帧）中的eip（也就是中断结束后返回执行的第一条指令）为e_entry
+	e->env_tf.tf_eip=elf_hdr->e_entry;
 
 	// Now map one page for the program's initial stack
 	// at virtual address USTACKTOP - PGSIZE.
 
 	// LAB 3: Your code here.
+	region_alloc(e, (void *)USTACKTOP-PGSIZE, PGSIZE);
+
+	// 设置完栈，最后切换回内核页目录
+	lcr3(PADDR(kern_pgdir));
 }
 
 //
@@ -367,6 +401,15 @@ void
 env_create(uint8_t *binary, enum EnvType type)
 {
 	// LAB 3: Your code here.
+	struct Env *new_e;
+	// 分配一个环境
+	int result = env_alloc(&new_e, 0);  // 传入接收指针，并指定parent_id为0
+	if(result!=0){
+		panic("env_create fail: %e\n", result);
+	}
+	// 加载ELF
+	load_icode(new_e, binary);
+	new_e->env_type = type;
 }
 
 //
@@ -483,7 +526,16 @@ env_run(struct Env *e)
 	//	e->env_tf to sensible values.
 
 	// LAB 3: Your code here.
+	if((curenv!=NULL) && curenv->env_status==ENV_RUNNING){
+		curenv->env_status=ENV_RUNNABLE;
+	}
+	curenv=e;
+	curenv->env_status=ENV_RUNNING;
+	curenv->env_runs++;
+	lcr3(PADDR(curenv->env_pgdir));
+    // 恢复环境的寄存器，并在环境中进入用户模式
+	env_pop_tf(&curenv->env_tf);
 
-	panic("env_run not yet implemented");
+	// panic("env_run not yet implemented");
 }
 
