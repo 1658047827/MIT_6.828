@@ -489,12 +489,12 @@ void
 env_pop_tf(struct Trapframe *tf)
 {
 	asm volatile(
-		"\tmovl %0,%%esp\n"
-		"\tpopal\n"
-		"\tpopl %%es\n"
-		"\tpopl %%ds\n"
-		"\taddl $0x8,%%esp\n" /* skip tf_trapno and tf_errcode */
-		"\tiret\n"
+		"\tmovl %0,%%esp\n"       // esp指向tf结构，从其中弹出的值进入相应寄存器
+		"\tpopal\n"				  // 弹出tf_regs中值到各通用寄存器
+		"\tpopl %%es\n"			  // 弹出tf_es 到 es寄存器
+		"\tpopl %%ds\n"			  // 弹出tf_ds 到 ds寄存器
+		"\taddl $0x8,%%esp\n" 	  // 跳过tf_trapno和tf_err
+		"\tiret\n" 				  // 中断返回 弹出tf_eip,tf_cs,tf_eflags,tf_esp,tf_ss到相应寄存器
 		: : "g" (tf) : "memory");
 	panic("iret failed");  /* mostly to placate the compiler */
 }
