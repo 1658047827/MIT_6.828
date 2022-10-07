@@ -109,8 +109,10 @@ trap_init(void)
 	extern uint32_t vectors[];
 	for(int i=0;i<T_SYSCALL;++i)
 		SETGATE(idt[i], 0, GD_KT, vectors[i], 0);
-	SETGATE(idt[T_BRKPT], 0, GD_KT, vectors[T_BRKPT], 3);
-	SETGATE(idt[T_SYSCALL], 1, GD_KT, vectors[T_SYSCALL], 3);
+	// 特别地，修改breakpoint的dpl
+	idt[T_BRKPT].gd_dpl=3;
+	// SETGATE(idt[T_BRKPT], 0, GD_KT, vectors[T_BRKPT], 3);
+	// SETGATE(idt[T_SYSCALL], 1, GD_KT, vectors[T_SYSCALL], 3);
 
 	// Per-CPU setup
 	trap_init_percpu();

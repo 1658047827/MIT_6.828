@@ -55,7 +55,7 @@
 /*
  * Lab 3: Your code here for generating entry points for the different traps.
  */
- /* To finish challenge, we use 'vectors' instead.
+ /* To finish challenge, I use 'vectors' instead.
   */
 # TRAPHANDLER_NOEC(t_divide, T_DIVIDE)       
 # TRAPHANDLER_NOEC(t_debug, T_DEBUG)		   
