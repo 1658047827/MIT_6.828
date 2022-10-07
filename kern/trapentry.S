@@ -20,13 +20,22 @@
  *   void NAME();
  * where NAME is the argument passed to TRAPHANDLER.
  */
+/* For challenge, we modified the macro TRAPHANDLER
+ * we use a 'if' to distinguish ec and noec
+ */
 #define TRAPHANDLER(name, num)						\
-	.globl name;		/* define global symbol for 'name' */	\
-	.type name, @function;	/* symbol type is function */		\
-	.align 2;		/* align function definition */		\
-	name:			/* function starts here */		\
-	pushl $(num);							\
-	jmp _alltraps
+	.data;	\
+		.long name;	\
+	.text;	\
+		.globl name;			/* define global symbol for 'name' */	\
+		.type name, @function;	/* symbol type is function */		\
+		.align 2;				/* align function definition */		\
+		name:					/* function starts here */		\
+		.if !(num==8 || num==17 || (num>=10 && num<=14));	\
+		pushl $0;	\
+		.endif;	\
+		pushl $(num);							\
+		jmp _alltraps
 
 /* Use TRAPHANDLER_NOEC for traps where the CPU doesn't push an error code.
  * It pushes a 0 in place of the error code, so the trap frame has the same
@@ -46,26 +55,28 @@
 /*
  * Lab 3: Your code here for generating entry points for the different traps.
  */
-TRAPHANDLER_NOEC(t_divide, T_DIVIDE)       
-TRAPHANDLER_NOEC(t_debug, T_DEBUG)		   
-TRAPHANDLER_NOEC(t_nmi, T_NMI)			
-TRAPHANDLER_NOEC(t_brkpt, T_BRKPT)
-TRAPHANDLER_NOEC(t_oflow, T_OFLOW)
-TRAPHANDLER_NOEC(t_bound, T_BOUND)
-TRAPHANDLER_NOEC(t_illop, T_ILLOP)
-TRAPHANDLER_NOEC(t_device, T_DEVICE)
-TRAPHANDLER(t_dblflt, T_DBLFLT)
+ /* To finish challenge, we use 'vectors' instead.
+  */
+# TRAPHANDLER_NOEC(t_divide, T_DIVIDE)       
+# TRAPHANDLER_NOEC(t_debug, T_DEBUG)		   
+# TRAPHANDLER_NOEC(t_nmi, T_NMI)			
+# TRAPHANDLER_NOEC(t_brkpt, T_BRKPT)
+# TRAPHANDLER_NOEC(t_oflow, T_OFLOW)
+# TRAPHANDLER_NOEC(t_bound, T_BOUND)
+# TRAPHANDLER_NOEC(t_illop, T_ILLOP)
+# TRAPHANDLER_NOEC(t_device, T_DEVICE)
+# TRAPHANDLER(t_dblflt, T_DBLFLT)
 
-TRAPHANDLER(t_tss, T_TSS)
-TRAPHANDLER(t_segnp, T_SEGNP)
-TRAPHANDLER(t_stack, T_STACK)
-TRAPHANDLER(t_gpflt, T_GPFLT)
-TRAPHANDLER(t_pgflt, T_PGFLT)
+# TRAPHANDLER(t_tss, T_TSS)
+# TRAPHANDLER(t_segnp, T_SEGNP)
+# TRAPHANDLER(t_stack, T_STACK)
+# TRAPHANDLER(t_gpflt, T_GPFLT)
+# TRAPHANDLER(t_pgflt, T_PGFLT)
 
-TRAPHANDLER_NOEC(t_fperr, T_FPERR)
-TRAPHANDLER(t_align, T_ALIGN)
-TRAPHANDLER_NOEC(t_mchk, T_MCHK)
-TRAPHANDLER_NOEC(t_simderr, T_SIMDERR)
+# TRAPHANDLER_NOEC(t_fperr, T_FPERR)
+# TRAPHANDLER(t_align, T_ALIGN)
+# TRAPHANDLER_NOEC(t_mchk, T_MCHK)
+# TRAPHANDLER_NOEC(t_simderr, T_SIMDERR)
 
 
 /*
@@ -83,3 +94,27 @@ _alltraps:
 	# pushl %esp to pass a pointer to the Trapframe as an argument to trap()
 	pushl %esp
 	call trap
+
+.data
+	.global vectors
+vectors:
+	TRAPHANDLER(t_divide, T_DIVIDE)       
+	TRAPHANDLER(t_debug, T_DEBUG)		   
+	TRAPHANDLER(t_nmi, T_NMI)			
+	TRAPHANDLER(t_brkpt, T_BRKPT)
+	TRAPHANDLER(t_oflow, T_OFLOW)
+	TRAPHANDLER(t_bound, T_BOUND)
+	TRAPHANDLER(t_illop, T_ILLOP)
+	TRAPHANDLER(t_device, T_DEVICE)
+	TRAPHANDLER(t_dblflt, T_DBLFLT)
+	TRAPHANDLER(vector9, 9)
+	TRAPHANDLER(t_tss, T_TSS)
+	TRAPHANDLER(t_segnp, T_SEGNP)
+	TRAPHANDLER(t_stack, T_STACK)
+	TRAPHANDLER(t_gpflt, T_GPFLT)
+	TRAPHANDLER(t_pgflt, T_PGFLT)
+	TRAPHANDLER(vector15, 15)
+	TRAPHANDLER(t_fperr, T_FPERR)
+	TRAPHANDLER(t_align, T_ALIGN)
+	TRAPHANDLER(t_mchk, T_MCHK)
+	TRAPHANDLER(t_simderr, T_SIMDERR)
