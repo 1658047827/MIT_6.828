@@ -194,6 +194,7 @@ trap_dispatch(struct Trapframe *tf)
 	// LAB 3: Your code here.
 	switch (tf->tf_trapno){
 		case T_PGFLT: page_fault_handler(tf); break;
+		case T_BRKPT: monitor(tf); break;
 		default: break;  // 跳出，前往下面的未知trap处理
 	}
 
