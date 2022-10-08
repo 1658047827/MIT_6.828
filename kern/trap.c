@@ -194,7 +194,7 @@ trap_dispatch(struct Trapframe *tf)
 	// LAB 3: Your code here.
 	switch (tf->tf_trapno){
 		case T_PGFLT: page_fault_handler(tf); break;
-		default: panic("unkonw trapno\n");
+		default: break;  // 跳出，前往下面的未知trap处理
 	}
 
 	// Unexpected trap: The user process or the kernel has a bug.
