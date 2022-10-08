@@ -30,6 +30,9 @@ static struct Command commands[] = {
 	{ "showmapping", "Display the physical page mappings that apply to a particular range of virtual/linear addresses", mon_showmapping},
 	{ "setperm", "Set the permissions of any memory mapping", mon_setpermisson},
 	{ "dump", "Dump the contents of a range of memory", mon_dump},
+	{ "c", "Continue running the program", mon_continue},
+	{ "si", "Step into current debugging program", mon_stepinto},
+
 };
 
 /***** Implementations of basic kernel monitor commands *****/
@@ -214,6 +217,26 @@ int mon_dump(int argc, char **argv, struct Trapframe *tf){  // 打印出指定�
 	return 0;
 }
 
+extern struct Env *curenv;
+extern void env_run(struct Env *e);
+int mon_continue(int argc, char **argv, struct Trapframe *tf){  // lab3 challenge2: c
+
+}
+
+int mon_stepinto(int argc, char **argv, struct Trapframe *tf){  // lab3 challenge2: si
+	if(argc!=1){
+		cprintf("Usage: si\n");
+		return 0;
+	}
+	if(tf==NULL){
+		cprintf("Error: si error\n");
+		return 0;
+	}
+	tf->tf_eflags |= FL_TF;  // 将TF位置为1，标志开始单步执行
+	cprintf("current eip: %08x\n", tf->tf_eip);
+	env_run(curenv);  // 继续运行
+	return 0;
+}
 
 /***** Kernel monitor command interpreter *****/
 
