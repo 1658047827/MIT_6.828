@@ -11,6 +11,7 @@
 #include <kern/monitor.h>
 #include <kern/kdebug.h>
 #include <kern/pmap.h>
+#include <kern/env.h>
 #include <kern/trap.h>
 
 #define CMDBUF_SIZE	80	// enough for one VGA text line
@@ -75,6 +76,7 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 
 		// cast ebp to ptr-type
 		uint32_t *base = (uint32_t*)ebp;
+		// cprintf("*ebp: %08x\n", *base); // 下一个循环中ebp的值
 		cprintf("ebp %08x  eip %08x  args %08x %08x %08x %08x %08x\n", 
 				ebp, 
 				*(base+1), 
@@ -217,10 +219,8 @@ int mon_dump(int argc, char **argv, struct Trapframe *tf){  // 打印出指定�
 	return 0;
 }
 
-extern struct Env *curenv;
-extern void env_run(struct Env *e);
 int mon_continue(int argc, char **argv, struct Trapframe *tf){  // lab3 challenge2: c
-
+	return 0;
 }
 
 int mon_stepinto(int argc, char **argv, struct Trapframe *tf){  // lab3 challenge2: si
