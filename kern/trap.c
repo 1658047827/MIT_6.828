@@ -83,6 +83,7 @@ trap_init(void)
     // void t_align();
     // void t_mchk();
     // void t_simderr();
+	// void t_syscall();
 
     // SETGATE(idt[T_DIVIDE], 0, GD_KT, t_divide, 0);
     // SETGATE(idt[T_DEBUG], 0, GD_KT, t_debug, 0);
@@ -105,14 +106,16 @@ trap_init(void)
     // SETGATE(idt[T_MCHK], 0, GD_KT, t_mchk, 0);
     // SETGATE(idt[T_SIMDERR], 0, GD_KT, t_simderr, 0);
 
+	// SETGATE(idt[T_SIMDERR], 1, GD_KT, t_syscall, 3);
+
 	// Challenge: (reference: xv6 source code)
 	extern uint32_t vectors[];
 	for(int i=0;i<T_SYSCALL;++i)
 		SETGATE(idt[i], 0, GD_KT, vectors[i], 0);
-	// 特别地，修改breakpoint的dpl
+	// 特别地，修改breakpoint的dpl，以允许用户调用
 	idt[T_BRKPT].gd_dpl=3;
-	// SETGATE(idt[T_BRKPT], 0, GD_KT, vectors[T_BRKPT], 3);
-	// SETGATE(idt[T_SYSCALL], 1, GD_KT, vectors[T_SYSCALL], 3);
+	// syscall中断门设置
+	SETGATE(idt[T_SYSCALL], 1, GD_KT, vectors[T_SYSCALL], 3);
 
 	// Per-CPU setup
 	trap_init_percpu();
@@ -193,8 +196,24 @@ trap_dispatch(struct Trapframe *tf)
 	// Handle processor exceptions.
 	// LAB 3: Your code here.
 	switch (tf->tf_trapno){
-		case T_PGFLT: page_fault_handler(tf); break;
-		case T_BRKPT: monitor(tf); break;
+		case T_PGFLT: 
+			page_fault_handler(tf);
+			return ;
+		case T_BRKPT: 
+			monitor(tf);
+			return ;
+		case T_SYSCALL:
+			// 此时寄存器信息已经存在tf中了
+			// 注意返回值要放入tf.eax，不能直接扔到寄存器eax里
+			// 之后的env_run会pop出tf中的值
+			tf->tf_regs.reg_eax=syscall(
+				tf->tf_regs.reg_eax,
+				tf->tf_regs.reg_edx,
+				tf->tf_regs.reg_ecx,
+				tf->tf_regs.reg_ebx,
+				tf->tf_regs.reg_edi,
+				tf->tf_regs.reg_esi);
+			return ;
 		default: break;  // 跳出，前往下面的未知trap处理
 	}
 
