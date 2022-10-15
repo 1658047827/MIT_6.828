@@ -283,8 +283,8 @@ region_alloc(struct Env *e, void *va, size_t len)
 
 	struct PageInfo *p;
 	// 按照提示进行舍入
-	void *begin = ROUNDDOWN(va, PGSIZE);
-	void *end = ROUNDUP(va+len, PGSIZE);
+	uintptr_t begin = ROUNDDOWN((uint32_t)va, PGSIZE);
+	uintptr_t end = ROUNDUP((uint32_t)va+len, PGSIZE);
 	// 循环分配映射页，同时注意end是向上舍入的，所以结束条件是<而不是<=
 	for(;begin<end;begin+=PGSIZE){
 		// 分配物理页
@@ -292,7 +292,7 @@ region_alloc(struct Env *e, void *va, size_t len)
 		// 如果分配失败则panic
 		if(!p) panic("region_alloc fail: out of memory\n");
 		// 使用page_insert插入，该函数内已经 perm | PTE_P 了
-		int result = page_insert(e->env_pgdir, p, begin, PTE_U | PTE_W);  
+		int result = page_insert(e->env_pgdir, p, (void*)begin, PTE_U | PTE_W);  
 		if(result!=0) panic("region_alloc: %e", result); 
 	}
 }

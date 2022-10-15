@@ -96,6 +96,7 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 					*(base+1)-info.eip_fn_addr);
 		}
 		ebp=*base;
+		cprintf("next ebp %08x\n", ebp);
 	}
 	return 0;
 }

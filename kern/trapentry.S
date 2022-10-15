@@ -41,14 +41,14 @@
  * It pushes a 0 in place of the error code, so the trap frame has the same
  * format in either case.
  */
-#define TRAPHANDLER_NOEC(name, num)					\
-	.globl name;							\
-	.type name, @function;						\
-	.align 2;							\
-	name:								\
-	pushl $0;							\
-	pushl $(num);							\
-	jmp _alltraps
+# #define TRAPHANDLER_NOEC(name, num)					\
+#	.globl name;							\
+#	.type name, @function;						\
+#	.align 2;							\
+#	name:								\
+#	pushl $0;							\
+#	pushl $(num);							\
+#	jmp _alltraps
 
 /* Use TRAPHANDLER_NULL to replace the undefined trap numbers
  * 仅仅用于占位，让syscall下标匹配 
@@ -57,7 +57,6 @@
 	.data;	\
 		.long 0
 
-.text
 
 /*
  * Lab 3: Your code here for generating entry points for the different traps.
@@ -86,22 +85,6 @@
 # TRAPHANDLER_NOEC(t_simderr, T_SIMDERR)
 
 # TRAPHANDLER_NOEC(t_syscall, T_SYSCALL)
-
-/*
- * Lab 3: Your code here for _alltraps
- */
-_alltraps:
-  	# push_ values to make the stack look like a struct Trapframe
-  	pushl %ds
-  	pushl %es
-  	pushal  # 压入所有的通用寄存器
-	# load GD_KD into %ds and %es 
-	movw $GD_KD, %ax
-	movw %ax, %ds
-	movw %ax, %es
-	# pushl %esp to pass a pointer to the Trapframe as an argument to trap()
-	pushl %esp
-	call trap
 
 .data
 	.global vectors
@@ -155,3 +138,19 @@ vectors:
 	TRAPHANDLER_NULL()
 	TRAPHANDLER_NULL()
 	TRAPHANDLER(t_syscall, T_SYSCALL)
+
+/*
+ * Lab 3: Your code here for _alltraps
+ */
+_alltraps:
+  	# push_ values to make the stack look like a struct Trapframe
+  	pushl %ds
+  	pushl %es
+  	pushal  # 压入所有的通用寄存器
+	# load GD_KD into %ds and %es 
+	movw $GD_KD, %ax
+	movw %ax, %ds
+	movw %ax, %es
+	# pushl %esp to pass a pointer to the Trapframe as an argument to trap()
+	pushl %esp
+	call trap
