@@ -86,6 +86,24 @@
 
 # TRAPHANDLER_NOEC(t_syscall, T_SYSCALL)
 
+
+
+/*
+ * Lab 3: Your code here for _alltraps
+ */
+_alltraps:
+  	# push_ values to make the stack look like a struct Trapframe
+  	pushl %ds
+  	pushl %es
+  	pushal  # 压入所有的通用寄存器
+	# load GD_KD into %ds and %es 
+	movw $GD_KD, %ax
+	movw %ax, %ds
+	movw %ax, %es
+	# pushl %esp to pass a pointer to the Trapframe as an argument to trap()
+	pushl %esp
+	call trap
+
 .data
 	.global vectors
 vectors:
@@ -138,19 +156,3 @@ vectors:
 	TRAPHANDLER_NULL()
 	TRAPHANDLER_NULL()
 	TRAPHANDLER(t_syscall, T_SYSCALL)
-
-/*
- * Lab 3: Your code here for _alltraps
- */
-_alltraps:
-  	# push_ values to make the stack look like a struct Trapframe
-  	pushl %ds
-  	pushl %es
-  	pushal  # 压入所有的通用寄存器
-	# load GD_KD into %ds and %es 
-	movw $GD_KD, %ax
-	movw %ax, %ds
-	movw %ax, %es
-	# pushl %esp to pass a pointer to the Trapframe as an argument to trap()
-	pushl %esp
-	call trap
