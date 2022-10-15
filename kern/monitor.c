@@ -77,14 +77,11 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 		// cast ebp to ptr-type
 		uint32_t *base = (uint32_t*)ebp;
 		// cprintf("*ebp: %08x\n", *base); // 下一个循环中ebp的值
-		cprintf("ebp %08x  eip %08x  args %08x %08x %08x %08x %08x\n", 
-				ebp, 
-				*(base+1), 
-				*(base+2), 
-				*(base+3), 
-				*(base+4), 
-				*(base+5), 
-				*(base+6));
+		cprintf("ebp %08x  eip %08x  args", ebp, *(base+1));
+		for(int i=2;i<=6;++i){
+			cprintf(" %08x", *(base+i));
+		}
+		cprintf("\n");
 
 		int valid=debuginfo_eip(*(base+1), &info);  // *(base+1) is eip
 		if(valid==0){
