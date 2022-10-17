@@ -340,9 +340,14 @@ page_init(void)
 	// 1) 设置0号页为被占用状态
 	pages[0].pp_ref=1;
 	pages[0].pp_link=NULL;
-	
-	// 2) 除了第0号页之外的base memory都是空闲的
+
+	// 2) 除了第0号页（lab4：和MPENTRY_PADDR所在物理页）之外的base memory（低640KB）都是空闲的
 	for (i = 1; i < npages_basemem; i++) {
+		if(i==PGNUM(MPENTRY_PADDR)){
+			// 标记为占用
+			pages[i].pp_ref=1;
+			pages[i].pp_link=NULL;
+		}
 		pages[i].pp_ref = 0;
 		pages[i].pp_link = page_free_list;
 		page_free_list = &pages[i];  // 从链表的头部插入
@@ -668,7 +673,18 @@ mmio_map_region(physaddr_t pa, size_t size)
 	// Hint: The staff solution uses boot_map_region.
 	//
 	// Your code here:
-	panic("mmio_map_region not implemented");
+	// panic("mmio_map_region not implemented");
+
+	size_t size_align = ROUNDUP(size, PGSIZE);
+	void *start = (void*)base;
+	// 判断是否溢出
+	if(base+size_align >= MMIOLIM)
+		panic("mmio_map_region overflows MMIOLIM\n");
+	// 建立映射，一般va、pa都是页对齐的
+	boot_map_region(kern_pgdir, base, size_align, pa, PTE_W | PTE_PCD | PTE_PWT);
+	// 更新base，指向下一个可映射虚拟地址
+	base+=size_align;
+	return start;
 }
 
 static uintptr_t user_mem_check_addr;
