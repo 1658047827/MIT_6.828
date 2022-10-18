@@ -11,6 +11,8 @@
 #include <kern/monitor.h>
 #include <kern/kdebug.h>
 #include <kern/pmap.h>
+#include <kern/env.h>
+#include <kern/trap.h>
 
 #define CMDBUF_SIZE	80	// enough for one VGA text line
 
@@ -29,6 +31,9 @@ static struct Command commands[] = {
 	{ "showmapping", "Display the physical page mappings that apply to a particular range of virtual/linear addresses", mon_showmapping},
 	{ "setperm", "Set the permissions of any memory mapping", mon_setpermisson},
 	{ "dump", "Dump the contents of a range of memory", mon_dump},
+	{ "c", "Continue running the program", mon_continue},
+	{ "si", "Step into current debugging program", mon_stepinto},
+
 };
 
 /***** Implementations of basic kernel monitor commands *****/
@@ -71,14 +76,12 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 
 		// cast ebp to ptr-type
 		uint32_t *base = (uint32_t*)ebp;
-		cprintf("ebp %08x  eip %08x  args %08x %08x %08x %08x %08x\n", 
-				ebp, 
-				*(base+1), 
-				*(base+2), 
-				*(base+3), 
-				*(base+4), 
-				*(base+5), 
-				*(base+6));
+		// cprintf("*ebp: %08x\n", *base); // 下一个循环中ebp的值
+		cprintf("ebp %08x  eip %08x  args", ebp, *(base+1));
+		for(int i=2;i<=6;++i){
+			cprintf(" %08x", *(base+i));
+		}
+		cprintf("\n");
 
 		int valid=debuginfo_eip(*(base+1), &info);  // *(base+1) is eip
 		if(valid==0){
@@ -213,6 +216,24 @@ int mon_dump(int argc, char **argv, struct Trapframe *tf){  // 打印出指定�
 	return 0;
 }
 
+int mon_continue(int argc, char **argv, struct Trapframe *tf){  // lab3 challenge2: c
+	return 0;
+}
+
+int mon_stepinto(int argc, char **argv, struct Trapframe *tf){  // lab3 challenge2: si
+	if(argc!=1){
+		cprintf("Usage: si\n");
+		return 0;
+	}
+	if(tf==NULL){
+		cprintf("Error: si error\n");
+		return 0;
+	}
+	tf->tf_eflags |= FL_TF;  // 将TF位置为1，标志开始单步执行
+	cprintf("current eip: %08x\n", tf->tf_eip);
+	env_run(curenv);  // 继续运行
+	return 0;
+}
 
 /***** Kernel monitor command interpreter *****/
 
@@ -266,6 +287,8 @@ monitor(struct Trapframe *tf)
 	cprintf("Welcome to the JOS kernel monitor!\n");
 	cprintf("Type 'help' for a list of commands.\n");
 
+	if (tf != NULL)
+		print_trapframe(tf);
 
 	while (1) {
 		buf = readline("K> ");
