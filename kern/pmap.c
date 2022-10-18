@@ -347,6 +347,7 @@ page_init(void)
 			// 标记为占用
 			pages[i].pp_ref=1;
 			pages[i].pp_link=NULL;
+			continue;
 		}
 		pages[i].pp_ref = 0;
 		pages[i].pp_link = page_free_list;
