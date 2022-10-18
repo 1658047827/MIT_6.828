@@ -342,13 +342,15 @@ page_init(void)
 	pages[0].pp_link=NULL;
 
 	// 2) 除了第0号页（lab4：和MPENTRY_PADDR所在物理页）之外的base memory（低640KB）都是空闲的
-	for (i = 1; i < npages_basemem; i++) {
-		if(i==PGNUM(MPENTRY_PADDR)){
-			// 标记为占用
-			pages[i].pp_ref=1;
-			pages[i].pp_link=NULL;
-			continue;
-		}
+	for (i = 1; i < PGNUM(MPENTRY_PADDR); i++) {
+		pages[i].pp_ref = 0;
+		pages[i].pp_link = page_free_list;
+		page_free_list = &pages[i];  // 从链表的头部插入
+	}
+	pages[PGNUM(MPENTRY_PADDR)].pp_ref=1;
+	pages[PGNUM(MPENTRY_PADDR)].pp_link=NULL;
+	++i;
+	for (; i < npages_basemem; i++) {
 		pages[i].pp_ref = 0;
 		pages[i].pp_link = page_free_list;
 		page_free_list = &pages[i];  // 从链表的头部插入
