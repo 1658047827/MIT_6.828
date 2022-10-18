@@ -296,7 +296,15 @@ mem_init_mp(void)
 	//     Permissions: kernel RW, user NONE
 	//
 	// LAB 4: Your code here:
-
+	uintptr_t kstacktop_i;
+	for(int i=0;i<NCPU;++i){  // 务必从0开始
+		kstacktop_i = KSTACKTOP-i*(KSTKSIZE + KSTKGAP);
+		boot_map_region(kern_pgdir, 
+						kstacktop_i-KSTKSIZE, 
+						KSTKSIZE,  // 注意这里是KSTKSIZE，下面的guard page不要映射
+						PADDR(percpu_kstacks[i]),
+						PTE_W);  // boot_map_region中自带PTE_P
+	}
 }
 
 // --------------------------------------------------------------
@@ -958,7 +966,6 @@ check_kern_pgdir(void)
 // defined by the page directory 'pgdir'.  The hardware normally performs
 // this functionality for us!  We define our own version to help check
 // the check_kern_pgdir() function; it shouldn't be used elsewhere.
-
 static physaddr_t
 check_va2pa(pde_t *pgdir, uintptr_t va)
 {
