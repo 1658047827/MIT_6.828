@@ -3,6 +3,15 @@
         "types.h": "c",
         "stdio.h": "c",
         "stab.h": "c",
-        "string.h": "c"
+        "string.h": "c",
+        "pmap.h": "c",
+        "monitor.h": "c",
+        "mmu.h": "c",
+        "error.h": "c",
+        "assert.h": "c",
+        "elf.h": "c",
+        "env.h": "c",
+        "trap.h": "c",
+        "lib.h": "c"
     }
 }
