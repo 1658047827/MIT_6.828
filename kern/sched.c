@@ -29,6 +29,19 @@ sched_yield(void)
 	// below to halt the cpu.
 
 	// LAB 4: Your code here.
+	struct Env* curr = curenv;
+	size_t index = 0;
+	size_t start = curr?ENVX(curr->env_id):0;  // 如果curr是NULL，说明之前没有跑过环境
+	for(size_t i=0;i<NENV;++i){
+		index = (start+i)%NENV;
+		if(envs[index].env_status == ENV_RUNNABLE){
+			env_run(&envs[index]);
+		}
+	}
+	if(curr && curr->env_status == ENV_RUNNING){
+		// 如果有上一个环境，并且这个环境RUNNING
+		env_run(curr);
+	}
 
 	// sched_halt never returns
 	sched_halt();

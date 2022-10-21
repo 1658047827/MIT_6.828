@@ -60,7 +60,10 @@ i386_init(void)
 	ENV_CREATE(TEST, ENV_TYPE_USER);
 #else
 	// Touch all you want.
-	ENV_CREATE(user_primes, ENV_TYPE_USER);
+	// ENV_CREATE(user_primes, ENV_TYPE_USER);
+	ENV_CREATE(user_yield, ENV_TYPE_USER);  // 创建三个用户进程
+	ENV_CREATE(user_yield, ENV_TYPE_USER);
+	ENV_CREATE(user_yield, ENV_TYPE_USER);
 #endif // TEST*
 
 	// Schedule and run the first user environment!
@@ -118,7 +121,7 @@ mp_main(void)
 	//
 	// Your code here:
 	lock_kernel();  // 尝试获取大内核锁
-	sched_yield();
+	sched_yield();  // 调度开始执行用户进程
 
 	// Remove this after you finish Exercise 6
 	for (;;);
