@@ -559,6 +559,10 @@ env_run(struct Env *e)
 	curenv->env_status=ENV_RUNNING;
 	curenv->env_runs++;
 	lcr3(PADDR(curenv->env_pgdir));
+
+	// 在切换回用户态之前解锁
+	unlock_kernel();
+
     // 恢复环境的寄存器，并在环境中进入用户模式
 	env_pop_tf(&curenv->env_tf);
 
