@@ -382,6 +382,35 @@ page_fault_handler(struct Trapframe *tf)
 	//   (the 'tf' variable points at 'curenv->env_tf').
 
 	// LAB 4: Your code here.
+	struct UTrapframe *utf = NULL;
+
+	if(curenv->env_pgfault_upcall != NULL) {
+		// 设置栈帧指针
+		if(UXSTACKTOP-PGSIZE <= tf->tf_esp && tf->tf_esp <= UXSTACKTOP-1){
+			// 说明此时已在用户异常栈上，要从tf->tf_esp开始压栈
+			// 并且要先push一个32-bit空字（也就是下面的"-4"），再push utf
+			utf = (struct UTrapframe*)(tf->tf_esp - sizeof(struct UTrapframe) - 4);
+		}else{
+			utf = (struct UTrapframe*)(UXSTACKTOP - sizeof(struct UTrapframe));
+		}
+
+		// 判断异常栈是否溢出，溢出就销毁该环境
+		user_mem_assert(curenv, (void*)utf, 1, PTE_W);  // utf是最低的地址，检查1字节足矣
+
+		// 压入相关寄存器
+		utf->utf_fault_va = fault_va;
+		utf->utf_err = tf->tf_err;
+		utf->utf_regs = tf->tf_regs;
+		utf->utf_eip = tf->tf_eip;  // 保存trap现场，用于返回
+		utf->utf_eflags = tf->tf_eflags;
+		utf->utf_esp = tf->tf_esp;  // 保存trap现场，用于返回
+
+		// 修改tf然后继续跑
+		tf->tf_eip = (uintptr_t)curenv->env_pgfault_upcall;
+		tf->tf_esp = (uintptr_t)utf;
+		env_run(curenv);  // 重新进入用户态
+		
+	} // 否则销毁当前进程（环境）
 
 	// Destroy the environment that caused the fault.
 	cprintf("[%08x] user fault va %08x ip %08x\n",
