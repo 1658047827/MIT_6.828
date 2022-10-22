@@ -29,7 +29,15 @@ set_pgfault_handler(void (*handler)(struct UTrapframe *utf))
 	if (_pgfault_handler == 0) {
 		// First time through!
 		// LAB 4: Your code here.
-		panic("set_pgfault_handler not implemented");
+
+		// envid=0表示当前env
+		int result = sys_page_alloc(0, UXSTACKTOP, PTE_U | PTE_P | PTE_W);
+		if(result < 0) panic("set_pgfault_handler error: %e", result);
+		// 设置处理函数为那段汇编代码，在里面会调用实际上的处理程序
+		// 同时这样相当于汇编代码作为中转，还能处理嵌套user page fault的情况
+		sys_env_set_pgfault_upcall(0, _pgfault_upcall);
+		
+		// panic("set_pgfault_handler not implemented");
 	}
 
 	// Save handler pointer for assembly to call.
