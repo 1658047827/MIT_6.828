@@ -31,7 +31,7 @@ set_pgfault_handler(void (*handler)(struct UTrapframe *utf))
 		// LAB 4: Your code here.
 
 		// envid=0表示当前env
-		int result = sys_page_alloc(0, UXSTACKTOP, PTE_U | PTE_P | PTE_W);
+		int result = sys_page_alloc(0, (void*)(UXSTACKTOP-PGSIZE), PTE_U | PTE_P | PTE_W);
 		if(result < 0) panic("set_pgfault_handler error: %e", result);
 		// 设置处理函数为那段汇编代码，在里面会调用实际上的处理程序
 		// 同时这样相当于汇编代码作为中转，还能处理嵌套user page fault的情况

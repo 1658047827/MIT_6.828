@@ -65,11 +65,11 @@ _pgfault_upcall:
 	// ways as registers become unavailable as scratch space.
 	//
 	// LAB 4: Your code here.
-	movl 0x28(%esp) %eax  // trap-time eip
+	movl 0x28(%esp), %eax  // trap-time eip
 	subl $4, 0x30(%esp)	  // 把异常栈里面存储的trap-time esp减4
 	// 减完就得保存下来, popfl之后不允许算术运算了
-	movl 0x30(%esp) %ebx  // trap-time esp-4
-	movl %eax (%ebx)	  // 将trap-time eip压入栈
+	movl 0x30(%esp), %ebx  // trap-time esp-4
+	movl %eax, (%ebx)	  // 将trap-time eip压入栈
 
 	// Restore the trap-time registers.  After you do this, you
 	// can no longer modify any general-purpose registers.
