@@ -55,6 +55,14 @@ int	sys_ipc_try_send(envid_t to_env, uint32_t value, void *pg, int perm);
 int	sys_ipc_recv(void *rcv_pg);
 
 // This must be inlined.  Exercise for reader: why?
+// 不使用inline会导致用户栈多一个栈帧。由于我们的fork是在用户空间实现的，
+// 使用其他的一系列syscall实现，包括sys_page_alloc, sys_page_map等。
+// 我们希望子进程一开始run就是从sys_exofork()函数退出来的状态，如果不内联的话，
+// 子进程的ESP在这里就会被设置得多向下指一个栈帧，这不是我们想要的。
+// 不妨以dumbfork.c为例，这里面的父进程退出sys_exofork之后，在接下来的代码中拷贝空间
+// 又会调用一些函数，用户栈的内容可能被反复改写，不再保持刚才sys_exofork的内容
+// 子进程醒来的时候，将会从ret开始执行，并且ESP指向的是在sys_exofork内时的位置，
+// 子进程会认为自己还在用户空间的sys_exofork内，但是用户栈已经被改过了，一执行就炸
 static inline envid_t __attribute__((always_inline))
 sys_exofork(void)
 {
