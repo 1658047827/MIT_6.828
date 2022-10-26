@@ -115,12 +115,20 @@ trap_init(void)
 
 	// SETGATE(idt[T_SIMDERR], 1, GD_KT, t_syscall, 3);
 
+	// 因为做了lab3 Challenge，所以lab4这里也不需要额外设置
+
 	// Challenge: (reference: xv6 source code)
 	extern uint32_t vectors[];
-	for(int i=0;i<T_SYSCALL;++i)
+	
+	for(int i=0;i<=T_SIMDERR;++i)
 		SETGATE(idt[i], 0, GD_KT, vectors[i], 0);
 	// 特别地，修改breakpoint的dpl，以允许用户调用
 	idt[T_BRKPT].gd_dpl=3;
+
+	// lab4涉及到IRQ，接下来的设置中调用SETGATE要注意istrap参数
+	for(int i=IRQ_OFFSET;i<=15+IRQ_OFFSET;++i)
+		SETGATE(idt[i], 0, GD_KT, vectors[i], 0);
+	
 	// syscall中断门设置
 	SETGATE(idt[T_SYSCALL], 1, GD_KT, vectors[T_SYSCALL], 3);
 
