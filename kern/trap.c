@@ -119,18 +119,25 @@ trap_init(void)
 
 	// Challenge: (reference: xv6 source code)
 	extern uint32_t vectors[];
+	int i=0;
 	
-	for(int i=0;i<=T_SIMDERR;++i)
+	for(;i<=T_SIMDERR;++i)
 		SETGATE(idt[i], 0, GD_KT, vectors[i], 0);
 	// 特别地，修改breakpoint的dpl，以允许用户调用
 	idt[T_BRKPT].gd_dpl=3;
+
+	for(;i<IRQ_OFFSET;++i)
+		SETGATE(idt[i], 0, GD_KT, vectors[i], 0);
 
 	// lab4涉及到IRQ，接下来的设置中调用SETGATE要注意istrap参数
 	for(int i=IRQ_OFFSET;i<=15+IRQ_OFFSET;++i)
 		SETGATE(idt[i], 0, GD_KT, vectors[i], 0);
 	
-	// syscall中断门设置
-	SETGATE(idt[T_SYSCALL], 1, GD_KT, vectors[T_SYSCALL], 3);
+	// syscall中断门设置，注意不同于xv6，JOS中外部中断在内核态总是不被允许的
+	// 所以以下的SETGATE需要istrap参数为0
+	//                      |
+	//                      v
+	SETGATE(idt[T_SYSCALL], 0, GD_KT, vectors[T_SYSCALL], 3);
 
 	// Per-CPU setup
 	trap_init_percpu();
