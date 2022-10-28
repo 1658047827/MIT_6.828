@@ -115,14 +115,29 @@ trap_init(void)
 
 	// SETGATE(idt[T_SIMDERR], 1, GD_KT, t_syscall, 3);
 
+	// 因为做了lab3 Challenge，所以lab4这里也不需要额外设置
+
 	// Challenge: (reference: xv6 source code)
 	extern uint32_t vectors[];
-	for(int i=0;i<T_SYSCALL;++i)
+	int i=0;
+	
+	for(;i<=T_SIMDERR;++i)
 		SETGATE(idt[i], 0, GD_KT, vectors[i], 0);
 	// 特别地，修改breakpoint的dpl，以允许用户调用
 	idt[T_BRKPT].gd_dpl=3;
-	// syscall中断门设置
-	SETGATE(idt[T_SYSCALL], 1, GD_KT, vectors[T_SYSCALL], 3);
+
+	for(;i<IRQ_OFFSET;++i)
+		SETGATE(idt[i], 0, GD_KT, vectors[i], 0);
+
+	// lab4涉及到IRQ，接下来的设置中调用SETGATE要注意istrap参数
+	for(int i=IRQ_OFFSET;i<=15+IRQ_OFFSET;++i)
+		SETGATE(idt[i], 0, GD_KT, vectors[i], 0);
+	
+	// syscall中断门设置，注意不同于xv6，JOS中外部中断在内核态总是不被允许的
+	// 所以以下的SETGATE需要istrap参数为0
+	//                      |
+	//                      v
+	SETGATE(idt[T_SYSCALL], 0, GD_KT, vectors[T_SYSCALL], 3);
 
 	// Per-CPU setup
 	trap_init_percpu();
@@ -263,6 +278,10 @@ trap_dispatch(struct Trapframe *tf)
 	// Handle clock interrupts. Don't forget to acknowledge the
 	// interrupt using lapic_eoi() before calling the scheduler!
 	// LAB 4: Your code here.
+	if(tf->tf_trapno == IRQ_OFFSET + IRQ_TIMER) {
+		lapic_eoi();
+		sched_yield();
+	}
 
 	// Unexpected trap: The user process or the kernel has a bug.
 	print_trapframe(tf);
@@ -300,6 +319,7 @@ trap(struct Trapframe *tf)
 		// Acquire the big kernel lock before doing any
 		// serious kernel work.
 		// LAB 4: Your code here.
+		lock_kernel();
 		assert(curenv);
 
 		// Garbage collect if current enviroment is a zombie
@@ -381,6 +401,36 @@ page_fault_handler(struct Trapframe *tf)
 	//   (the 'tf' variable points at 'curenv->env_tf').
 
 	// LAB 4: Your code here.
+	// print_trapframe(tf);
+	struct UTrapframe *utf = NULL;
+
+	if(curenv->env_pgfault_upcall != NULL) {
+		// 设置栈帧指针
+		if(UXSTACKTOP-PGSIZE <= tf->tf_esp && tf->tf_esp <= UXSTACKTOP-1){
+			// 说明此时已在用户异常栈上，要从tf->tf_esp开始压栈
+			// 并且要先push一个32-bit空字（也就是下面的"-4"），再push utf
+			utf = (struct UTrapframe*)(tf->tf_esp - sizeof(struct UTrapframe) - 4);
+		}else{
+			utf = (struct UTrapframe*)(UXSTACKTOP - sizeof(struct UTrapframe));
+		}
+
+		// 判断异常栈是否溢出，溢出就销毁该环境
+		user_mem_assert(curenv, (void*)utf, 1, PTE_W);  // utf是最低的地址，检查1字节足矣
+
+		// 压入相关寄存器
+		utf->utf_fault_va = fault_va;
+		utf->utf_err = tf->tf_err;
+		utf->utf_regs = tf->tf_regs;
+		utf->utf_eip = tf->tf_eip;  // 保存trap现场，用于返回
+		utf->utf_eflags = tf->tf_eflags;
+		utf->utf_esp = tf->tf_esp;  // 保存trap现场，用于返回
+
+		// 修改tf然后继续跑
+		tf->tf_eip = (uintptr_t)curenv->env_pgfault_upcall;
+		tf->tf_esp = (uintptr_t)utf;
+		env_run(curenv);  // 重新进入用户态
+		
+	} // 否则销毁当前进程（环境）
 
 	// Destroy the environment that caused the fault.
 	cprintf("[%08x] user fault va %08x ip %08x\n",

@@ -297,7 +297,7 @@ mem_init_mp(void)
 	//
 	// LAB 4: Your code here:
 	uintptr_t kstacktop_i;
-	for(int i=0;i<NCPU;++i){  // 务必从0开始
+	for(int i=0;i<NCPU;++i){  // 务必从0开始，重新映射第0个内核栈，不用原本的bootstack
 		kstacktop_i = KSTACKTOP-i*(KSTKSIZE + KSTKGAP);
 		boot_map_region(kern_pgdir, 
 						kstacktop_i-KSTKSIZE, 
@@ -306,7 +306,6 @@ mem_init_mp(void)
 						PTE_W);  // boot_map_region中自带PTE_P
 	}
 }
-
 // --------------------------------------------------------------
 // Tracking of physical pages.
 // The 'pages' array has one 'struct PageInfo' entry per physical page.

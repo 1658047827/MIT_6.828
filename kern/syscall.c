@@ -86,7 +86,22 @@ sys_exofork(void)
 	// will appear to return 0.
 
 	// LAB 4: Your code here.
-	panic("sys_exofork not implemented");
+	struct Env * child = NULL;
+	struct Env * cur = curenv;
+
+	int result = env_alloc(&child, cur->env_id);  // 注意这里传入的是cur自己的envid
+	if(result < 0) return result;  // 出现-E_NO_FREE_ENV或者-E_NO_MEM
+	// 将子进程的寄存器设置成和父进程一样
+	child->env_tf = cur->env_tf;
+	// 设为ENV_NOT_RUNNABLE
+	child->env_status = ENV_NOT_RUNNABLE;
+	// 返回值会被放入寄存器EAX，所以修改子进程的EAX
+	child->env_tf.tf_regs.reg_eax = 0;
+
+	// 返回子进程的envid
+	return child->env_id;
+
+	// panic("sys_exofork not implemented");
 }
 
 // Set envid's env_status to status, which must be ENV_RUNNABLE
@@ -106,7 +121,18 @@ sys_env_set_status(envid_t envid, int status)
 	// envid's status.
 
 	// LAB 4: Your code here.
-	panic("sys_env_set_status not implemented");
+	int result = 0;
+	struct Env *env = NULL;
+
+	if(status!=ENV_NOT_RUNNABLE && status!=ENV_RUNNABLE)
+		return -E_INVAL;
+	if((result = envid2env(envid, &env, 1)) < 0)
+		return result;
+	env->env_status = status; // 设置status
+
+	return 0;
+
+	// panic("sys_env_set_status not implemented");
 }
 
 // Set the page fault upcall for 'envid' by modifying the corresponding struct
@@ -121,7 +147,16 @@ static int
 sys_env_set_pgfault_upcall(envid_t envid, void *func)
 {
 	// LAB 4: Your code here.
-	panic("sys_env_set_pgfault_upcall not implemented");
+	struct Env *env = NULL;
+	int result = 0;
+
+	if((result = envid2env(envid, &env, 1)) < 0)
+		return result;
+	env->env_pgfault_upcall = func;
+
+	return 0;  // 成功
+
+	// panic("sys_env_set_pgfault_upcall not implemented");
 }
 
 // Allocate a page of memory and map it at 'va' with permission
@@ -151,7 +186,27 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 	//   allocated!
 
 	// LAB 4: Your code here.
-	panic("sys_page_alloc not implemented");
+	struct Env *env = NULL;
+	struct PageInfo *pp = NULL;
+	int result = 0;
+
+	if((size_t)va>=UTOP || PGOFF((size_t)va))  // va要符合规范
+		return -E_INVAL;
+	if(!(perm&(PTE_U | PTE_P)) || perm&(~PTE_SYSCALL))  // perm要符合规定
+		return -E_INVAL;
+	if((result = envid2env(envid, &env, 1)) < 0) 
+		return result;
+	if(!(pp = page_alloc(ALLOC_ZERO))) 
+		return -E_NO_MEM;
+	if((result = page_insert(env->env_pgdir, pp, va, perm)) < 0){
+		// 如果失败，要释放分配的物理页
+		page_free(pp);
+		return result;
+	}
+
+	return 0;  // 成功
+
+	// panic("sys_page_alloc not implemented");
 }
 
 // Map the page of memory at 'srcva' in srcenvid's address space
@@ -165,7 +220,7 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 //		or the caller doesn't have permission to change one of them.
 //	-E_INVAL if srcva >= UTOP or srcva is not page-aligned,
 //		or dstva >= UTOP or dstva is not page-aligned.
-//	-E_INVAL is srcva is not mapped in srcenvid's address space.
+//	-E_INVAL if srcva is not mapped in srcenvid's address space.
 //	-E_INVAL if perm is inappropriate (see sys_page_alloc).
 //	-E_INVAL if (perm & PTE_W), but srcva is read-only in srcenvid's
 //		address space.
@@ -182,7 +237,39 @@ sys_page_map(envid_t srcenvid, void *srcva,
 	//   check the current permissions on the page.
 
 	// LAB 4: Your code here.
-	panic("sys_page_map not implemented");
+	struct Env *dstenv = NULL;
+	struct Env *srcenv = NULL;
+	pte_t *pte = NULL;
+	int result = 0;
+	
+	// 检验环境存在和调用者是否有足够权限
+	if((result = envid2env(dstenvid, &dstenv, 1)) < 0)
+		return result;
+	if((result = envid2env(srcenvid, &srcenv, 1)) < 0)
+		return result;
+	// 检验越界和页对齐
+	if((size_t)srcva>=UTOP || PGOFF((size_t)srcva))
+		return -E_INVAL;
+	if((size_t)dstva>=UTOP || PGOFF((size_t)dstva))
+		return -E_INVAL;
+	// perm要符合规定
+	if(!(perm&(PTE_U | PTE_P)) || perm&(~PTE_SYSCALL))  
+		return -E_INVAL;
+
+	struct PageInfo *srcpp = page_lookup(srcenv->env_pgdir, srcva, &pte);
+	if(srcpp == NULL)
+		// 说明srcenvid的地址空间中srcva未映射
+		return -E_INVAL;
+	if((perm&PTE_W) && !((*pte)&PTE_W))
+		// srcva只读，但是perm加入写权限
+		return -E_INVAL;
+	
+	if((result = page_insert(dstenv->env_pgdir, srcpp, dstva, perm)) < 0)
+		return result;
+	
+	return 0;  // 成功
+
+	// panic("sys_page_map not implemented");
 }
 
 // Unmap the page of memory at 'va' in the address space of 'envid'.
@@ -198,7 +285,18 @@ sys_page_unmap(envid_t envid, void *va)
 	// Hint: This function is a wrapper around page_remove().
 
 	// LAB 4: Your code here.
-	panic("sys_page_unmap not implemented");
+	struct Env *env = NULL;
+	int result = 0;
+	
+	if((result = envid2env(envid, &env, 1)) < 0)
+		return result;
+	if((size_t)va>=UTOP || PGOFF((size_t)va))  // va要符合规范
+		return -E_INVAL;
+	page_remove(env->env_pgdir, va);
+
+	return 0;
+
+	// panic("sys_page_unmap not implemented");
 }
 
 // Try to send 'value' to the target env 'envid'.
@@ -243,7 +341,48 @@ static int
 sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 {
 	// LAB 4: Your code here.
-	panic("sys_ipc_try_send not implemented");
+	// panic("sys_ipc_try_send not implemented");
+
+	struct Env *target = NULL;
+	struct PageInfo *pp = NULL;
+	int r = 0;
+	pte_t *pte = NULL;
+	
+	if((r = envid2env(envid, &target, 0)) < 0)  // checkperm = 0
+		return -E_BAD_ENV;
+
+	// 目标不在接收状态
+	if(target->env_ipc_recving==false || target->env_status!=ENV_NOT_RUNNABLE){
+		return -E_IPC_NOT_RECV;
+	}
+
+	if((uintptr_t)srcva < UTOP){  // 有效的srcva参数
+		if(!(perm&(PTE_U | PTE_P)) || perm&(~PTE_SYSCALL))  // perm要符合规定
+			return -E_INVAL;
+		if(PGOFF(srcva))  // 要页对齐
+			return -E_INVAL;
+		if(!(pp = page_lookup(curenv->env_pgdir, srcva, &pte)))  // 于调用者的空间中，srcva未映射
+			return -E_INVAL;
+		if((perm & PTE_W) && !((*pte) & PTE_W))  // srcva在当前环境空间中只读
+			return -E_INVAL;
+	}
+
+	target->env_ipc_recving = 0;
+	target->env_ipc_from = curenv->env_id;
+	target->env_ipc_value = value;
+	// dstva<UTOP，表示愿意接收page
+	if((uintptr_t)target->env_ipc_dstva < UTOP){
+		// 不能直接调用之前的sys_page_alloc，因为其中envid2env(..., ..., 1)
+		if((r = page_insert(target->env_pgdir, pp, target->env_ipc_dstva, perm)) < 0)
+			return r;
+		target->env_ipc_perm = perm;
+	}else{
+		target->env_ipc_perm = 0;
+	}
+	target->env_status = ENV_RUNNABLE;  // 设置为可以run
+	target->env_tf.tf_regs.reg_eax = 0;  // 由发送方设置为0，正常唤醒会认为返回值为0
+	
+	return 0;
 }
 
 // Block until a value is ready.  Record that you want to receive
@@ -261,7 +400,20 @@ static int
 sys_ipc_recv(void *dstva)
 {
 	// LAB 4: Your code here.
-	panic("sys_ipc_recv not implemented");
+	// panic("sys_ipc_recv not implemented");
+
+	// 失败：dstva不符合
+	if(((uintptr_t)dstva < UTOP) && PGOFF(dstva)){
+		return -E_INVAL;
+	}
+
+	curenv->env_ipc_recving = true;
+	curenv->env_ipc_dstva = dstva;
+	// 没必要调用sys_env_set_status
+	curenv->env_status = ENV_NOT_RUNNABLE;
+
+	sched_yield();
+
 	return 0;
 }
 
@@ -285,8 +437,28 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 			return sys_env_destroy(a1);
 		case SYS_getenvid:
 			return sys_getenvid();
+		case SYS_yield:
+			sys_yield();
+			break;
+		case SYS_exofork:
+			return sys_exofork();
+		case SYS_page_alloc:
+			return sys_page_alloc(a1, (void*)a2, a3);
+		case SYS_env_set_status:
+			return sys_env_set_status(a1, a2);
+		case SYS_page_map:
+			return sys_page_map(a1, (void*)a2, a3, (void*)a4, a5);
+		case SYS_page_unmap:
+			return sys_page_unmap(a1, (void*)a2);
+		case SYS_env_set_pgfault_upcall:
+			return sys_env_set_pgfault_upcall(a1, (void*)a2);
+		case SYS_ipc_recv:
+			return sys_ipc_recv((void*)a1);
+		case SYS_ipc_try_send:
+			return sys_ipc_try_send(a1, a2, (void*)a3, a4);
 		default:
 			return -E_INVAL;
 	}
+	return 0;
 }
 

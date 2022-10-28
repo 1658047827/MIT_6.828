@@ -198,6 +198,7 @@ env_setup_vm(struct Env *e)
 
 	// UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R
+	// 重新构造UVPT
 	e->env_pgdir[PDX(UVPT)] = PADDR(e->env_pgdir) | PTE_P | PTE_U;
 
 	return 0;
@@ -260,6 +261,7 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 
 	// Enable interrupts while in user mode.
 	// LAB 4: Your code here.
+	e->env_tf.tf_eflags |= FL_IF;  // 开外部中断(硬件中断)
 
 	// Clear the page fault handler until user installs one.
 	e->env_pgfault_upcall = 0;
@@ -559,6 +561,10 @@ env_run(struct Env *e)
 	curenv->env_status=ENV_RUNNING;
 	curenv->env_runs++;
 	lcr3(PADDR(curenv->env_pgdir));
+
+	// 在切换回用户态之前解锁
+	unlock_kernel();
+
     // 恢复环境的寄存器，并在环境中进入用户模式
 	env_pop_tf(&curenv->env_tf);
 

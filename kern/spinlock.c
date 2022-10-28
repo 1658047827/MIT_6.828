@@ -69,7 +69,7 @@ spin_lock(struct spinlock *lk)
 	// It also serializes, so that reads after acquire are not
 	// reordered before it. 
 	while (xchg(&lk->locked, 1) != 0)
-		asm volatile ("pause");
+		asm volatile ("pause");  // pause指令能够提升自旋循环的性能
 
 	// Record info about lock acquisition for debugging.
 #ifdef DEBUG_SPINLOCK
