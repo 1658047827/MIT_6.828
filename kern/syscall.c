@@ -341,7 +341,48 @@ static int
 sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 {
 	// LAB 4: Your code here.
-	panic("sys_ipc_try_send not implemented");
+	// panic("sys_ipc_try_send not implemented");
+
+	struct Env *target = NULL;
+	struct PageInfo *pp = NULL;
+	int r = 0;
+	pte_t *pte = NULL;
+	
+	if((r = envid2env(envid, &target, 0)) < 0)  // checkperm = 0
+		return -E_BAD_ENV;
+
+	// 目标不在接收状态
+	if(target->env_ipc_recving==false || target->env_status!=ENV_NOT_RUNNABLE){
+		return -E_IPC_NOT_RECV;
+	}
+
+	if((uintptr_t)srcva < UTOP){  // 有效的srcva参数
+		if(!(perm&(PTE_U | PTE_P)) || perm&(~PTE_SYSCALL))  // perm要符合规定
+			return -E_INVAL;
+		if(PGOFF(srcva))  // 要页对齐
+			return -E_INVAL;
+		if(!(pp = page_lookup(curenv->env_pgdir, srcva, &pte)))  // 于调用者的空间中，srcva未映射
+			return -E_INVAL;
+		if((perm & PTE_W) && !((*pte) & PTE_W))  // srcva在当前环境空间中只读
+			return -E_INVAL;
+	}
+
+	target->env_ipc_recving = 0;
+	target->env_ipc_from = curenv->env_id;
+	target->env_ipc_value = value;
+	// dstva<UTOP，表示愿意接收page
+	if((uintptr_t)target->env_ipc_dstva < UTOP){
+		// 不能直接调用之前的sys_page_alloc，因为其中envid2env(..., ..., 1)
+		if((r = page_insert(target->env_pgdir, pp, target->env_ipc_dstva, perm)) < 0)
+			return r;
+		target->env_ipc_perm = perm;
+	}else{
+		target->env_ipc_perm = 0;
+	}
+	target->env_status = ENV_RUNNABLE;  // 设置为可以run
+	target->env_tf.tf_regs.reg_eax = 0;  // 由发送方设置为0，正常唤醒会认为返回值为0
+	
+	return 0;
 }
 
 // Block until a value is ready.  Record that you want to receive
@@ -359,7 +400,20 @@ static int
 sys_ipc_recv(void *dstva)
 {
 	// LAB 4: Your code here.
-	panic("sys_ipc_recv not implemented");
+	// panic("sys_ipc_recv not implemented");
+
+	// 失败：dstva不符合
+	if(((uintptr_t)dstva < UTOP) && PGOFF(dstva)){
+		return -E_INVAL;
+	}
+
+	curenv->env_ipc_recving = true;
+	curenv->env_ipc_dstva = dstva;
+	// 没必要调用sys_env_set_status
+	curenv->env_status = ENV_NOT_RUNNABLE;
+
+	sched_yield();
+
 	return 0;
 }
 
@@ -398,6 +452,10 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 			return sys_page_unmap(a1, (void*)a2);
 		case SYS_env_set_pgfault_upcall:
 			return sys_env_set_pgfault_upcall(a1, (void*)a2);
+		case SYS_ipc_recv:
+			return sys_ipc_recv((void*)a1);
+		case SYS_ipc_try_send:
+			return sys_ipc_try_send(a1, a2, (void*)a3, a4);
 		default:
 			return -E_INVAL;
 	}

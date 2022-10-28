@@ -401,6 +401,7 @@ page_fault_handler(struct Trapframe *tf)
 	//   (the 'tf' variable points at 'curenv->env_tf').
 
 	// LAB 4: Your code here.
+	// print_trapframe(tf);
 	struct UTrapframe *utf = NULL;
 
 	if(curenv->env_pgfault_upcall != NULL) {
